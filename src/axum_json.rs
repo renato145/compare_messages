@@ -5,10 +5,10 @@ use log::debug;
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JsonMessage {
-    values: Vec<f64>,
-    descriptions: Vec<String>,
+    pub values: Vec<f64>,
+    pub descriptions: Vec<String>,
 }
 
 pub async fn test_json_message(
