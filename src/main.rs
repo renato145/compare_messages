@@ -1,9 +1,6 @@
 use anyhow::Result;
 use axum::{body::Bytes, routing::post, Json, Router};
-use compare_messages::{
-    proto_msg::messager_server::MessagerServer, test_avro_axum_message, test_avro_zmq_message,
-    test_grpc_message, test_json_message, test_zmq_json_message, JsonMessage, ServerGrpc, SCHEMA,
-};
+use compare_messages::{JsonMessage, SCHEMA, ServerGrpc, proto_msg::{self, messager_server::MessagerServer}, test_avro_axum_message, test_avro_zmq_message, test_grpc_message, test_json_message, test_zmq_json_message};
 use env_logger::Env;
 use log::{debug, info};
 use std::net::SocketAddr;
@@ -40,7 +37,8 @@ async fn main() -> Result<()> {
     });
 
     let client = reqwest::Client::new();
-    let tests = [1, 10, 100, 500, 1000, 5000, 10_000];
+    let tests = [1, 10, 100, 500, 1000, 5000, 10_000, 50_000];
+    // let tests = [3];
 
     for n in tests {
         let result = test_json_message(n_tests, &client, n).await?;
@@ -119,6 +117,35 @@ async fn zmq_json_server() {
     }
 }
 
+// async fn zmq_grpc_server() {
+//     let mut socket = zeromq::RepSocket::new();
+//     let addr = "tcp://127.0.0.1:7000";
+//     socket.bind(addr).await.expect("Failed to connect");
+//     info!("zmq avro listening on {}", addr);
+
+//     loop {
+//         let msg = socket.recv().await.unwrap();
+//         let bytes = msg.iter().flat_map(|o| o.to_vec()).collect::<Vec<_>>();
+
+//         proto_msg::Message
+
+
+//         // let value = avro_rs::Reader::new(&bytes[..])
+//         //     .unwrap()
+//         //     .into_iter()
+//         //     .next()
+//         //     .unwrap()
+//         //     .unwrap();
+//         // let decoded = avro_rs::from_value::<JsonMessage>(&value).unwrap();
+//         // debug!("Server got: {:?}", decoded);
+//         // let mut writer = avro_rs::Writer::new(&SCHEMA, Vec::new());
+//         // writer.append_ser(&decoded).unwrap();
+//         // let encoded = writer.into_inner().unwrap();
+//         // let encoded_msg = ZmqMessage::from(encoded);
+//         // socket.send(encoded_msg).await.unwrap();
+//     }
+// }
+
 async fn zmq_avro_server() {
     let mut socket = zeromq::RepSocket::new();
     let addr = "tcp://127.0.0.1:6000";
@@ -139,7 +166,6 @@ async fn zmq_avro_server() {
         let mut writer = avro_rs::Writer::new(&SCHEMA, Vec::new());
         writer.append_ser(&decoded).unwrap();
         let encoded = writer.into_inner().unwrap();
-        // let encoded = Bytes::from_iter(encoded);
         let encoded_msg = ZmqMessage::from(encoded);
         socket.send(encoded_msg).await.unwrap();
     }
