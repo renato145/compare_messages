@@ -1,0 +1,11 @@
+syntax = "proto3";
+package message;
+
+service Messager {
+	rpc SendMessage (Message) returns (Message);
+}
+
+message Message {
+	repeated double values = 1;
+	repeated string descriptions = 2;
+}

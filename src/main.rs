@@ -1,20 +1,12 @@
 use anyhow::Result;
 use axum::{routing::post, Json, Router};
-use env_logger::Env;
-use fake::{faker::lorem::en::Words, Fake};
-use log::{debug, info};
-use serde::{Deserialize, Serialize};
-use std::{
-    net::SocketAddr,
-    ops::Div,
-    time::{Duration, Instant},
+use compare_messages::{
+    proto_msg::messager_server::MessagerServer, test_grpc_message, test_json_message, JsonMessage,
+    ServerGrpc,
 };
-
-#[derive(Debug, Serialize, Deserialize)]
-struct Message {
-    values: Vec<f64>,
-    descriptions: Vec<String>,
-}
+use env_logger::Env;
+use log::{debug, info};
+use std::net::SocketAddr;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -31,97 +23,50 @@ async fn main() -> Result<()> {
     info!("Sending {} messages...", n_tests);
 
     tokio::spawn(async {
-        server().await;
+        axum_server().await;
+    });
+
+    tokio::spawn(async {
+        grpc_server().await;
     });
 
     let client = reqwest::Client::new();
-
-    let tests = [10, 100, 1000];
+    let tests = [10, 100, 1000, 5000];
 
     for n in tests {
-        let result = test_message(n_tests, &client, n).await?;
+        let result = test_json_message(n_tests, &client, n).await?;
+        println!("{}", result);
+        let result = test_grpc_message(n_tests, n).await?;
         println!("{}", result);
     }
 
     Ok(())
 }
 
-struct TestResult {
-    title: String,
-    n_tests: usize,
-    num_elements: usize,
-    elapsed: Duration,
-    elapsed_mean: Duration,
-}
-
-impl TestResult {
-    fn new(
-        title: impl Into<String>,
-        n_tests: usize,
-        num_elements: usize,
-        elapsed: Duration,
-    ) -> Self {
-        let elapsed_mean = elapsed.div(n_tests.try_into().unwrap());
-        Self {
-            title: title.into(),
-            n_tests,
-            num_elements,
-            elapsed,
-            elapsed_mean,
-        }
-    }
-}
-
-impl std::fmt::Display for TestResult {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}: {} elements\t| elapsed ({} messages)={:?}\t| elapsed (mean)={:?}",
-            self.title, self.num_elements, self.n_tests, self.elapsed, self.elapsed_mean
-        )
-    }
-}
-
-async fn test_message(
-    n_tests: usize,
-    client: &reqwest::Client,
-    num_elements: usize,
-) -> Result<TestResult> {
-    let msg = Message {
-        values: fake::vec![f64; num_elements],
-        descriptions: Words(num_elements..num_elements + 1).fake(),
-    };
-
-    let json_result = {
-        let t0 = Instant::now();
-        for _ in 0..n_tests {
-            let msg = client
-                .post("http://127.0.0.1:3000/json")
-                .json(&msg)
-                .send()
-                .await?
-                .json::<Message>()
-                .await?;
-            debug!("Client got: {:?}", msg);
-        }
-        TestResult::new("JSON", n_tests, num_elements, t0.elapsed())
-    };
-
-    Ok(json_result)
-}
-
-async fn server() {
+async fn axum_server() {
     let app = Router::new().route("/json", post(json_msg));
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
-    info!("listening on {}", addr);
+    info!("axum listening on {}", addr);
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
         .await
         .unwrap();
 }
 
-async fn json_msg(Json(message): Json<Message>) -> Json<Message> {
+async fn json_msg(Json(message): Json<JsonMessage>) -> Json<JsonMessage> {
     debug!("Server got: {:?}", message);
     Json(message)
+}
+
+async fn grpc_server() {
+    let addr = "[::1]:4000".parse().unwrap();
+    let greeter = ServerGrpc::default();
+    info!("grpc listening on {}", addr);
+
+    tonic::transport::Server::builder()
+        .add_service(MessagerServer::new(greeter))
+        .serve(addr)
+        .await
+        .unwrap();
 }
