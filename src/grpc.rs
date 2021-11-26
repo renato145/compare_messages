@@ -19,8 +19,8 @@ pub struct ServerGrpc {}
 #[tonic::async_trait]
 impl Messager for ServerGrpc {
     async fn send_message(&self, request: Request<Message>) -> Result<Response<Message>, Status> {
-        debug!("Got {:?}", request);
         let reply = request.into_inner();
+        debug!("Got {:?}", reply);
         Ok(Response::new(reply))
     }
 }
@@ -36,7 +36,7 @@ pub async fn test_grpc_message(n_tests: usize, num_elements: usize) -> Result<Te
     let t0 = Instant::now();
     for _ in 0..n_tests {
         let request = tonic::Request::new(msg.clone());
-        let response = client.send_message(request).await?;
+        let response = client.send_message(request).await?.into_inner();
         debug!("Client got: {:?}", response);
     }
     let grpc_result = TestResult::new("Tonic grpc", n_tests, num_elements, t0.elapsed());

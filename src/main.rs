@@ -1,9 +1,8 @@
 use anyhow::Result;
-use avro_rs::Schema;
 use axum::{body::Bytes, routing::post, Json, Router};
 use compare_messages::{
     proto_msg::messager_server::MessagerServer, test_avro_message, test_grpc_message,
-    test_json_message, JsonMessage, ServerGrpc, RAW_SCHEMA,
+    test_json_message, JsonMessage, ServerGrpc, SCHEMA,
 };
 use env_logger::Env;
 use log::{debug, info};
@@ -32,7 +31,7 @@ async fn main() -> Result<()> {
     });
 
     let client = reqwest::Client::new();
-    let tests = [10, 100, 1000, 5000];
+    let tests = [1, 10, 100, 500, 1000, 5000, 10_000];
 
     for n in tests {
         let result = test_json_message(n_tests, &client, n).await?;
@@ -74,8 +73,7 @@ async fn avro_msg(body: Bytes) -> Bytes {
         .unwrap();
     let decoded = avro_rs::from_value::<JsonMessage>(&value).unwrap();
     debug!("Server got: {:?}", decoded);
-    let schema = Schema::parse_str(RAW_SCHEMA).unwrap();
-    let mut writer = avro_rs::Writer::new(&schema, Vec::new());
+    let mut writer = avro_rs::Writer::new(&SCHEMA, Vec::new());
     writer.append_ser(&decoded).unwrap();
     let encoded = writer.into_inner().unwrap();
     Bytes::from_iter(encoded)

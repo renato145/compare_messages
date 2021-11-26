@@ -1,11 +1,9 @@
 use crate::{JsonMessage, TestResult};
 use anyhow::Result;
-use avro_rs::from_value;
-use avro_rs::Reader;
-use avro_rs::Schema;
-use avro_rs::Writer;
+use avro_rs::{from_value, Reader, Schema, Writer};
 use fake::{faker::lorem::en::Words, Fake};
 use log::debug;
+use once_cell::sync::Lazy;
 use std::time::Instant;
 
 pub const RAW_SCHEMA: &str = r#"
@@ -19,6 +17,8 @@ pub const RAW_SCHEMA: &str = r#"
     }
 "#;
 
+pub static SCHEMA: Lazy<Schema> = Lazy::new(|| Schema::parse_str(RAW_SCHEMA).unwrap());
+
 pub async fn test_avro_message(
     n_tests: usize,
     client: &reqwest::Client,
@@ -28,11 +28,10 @@ pub async fn test_avro_message(
         values: fake::vec![f64; num_elements],
         descriptions: Words(num_elements..num_elements + 1).fake(),
     };
-    let schema = Schema::parse_str(RAW_SCHEMA).unwrap();
 
     let t0 = Instant::now();
     for _ in 0..n_tests {
-        let mut writer = Writer::new(&schema, Vec::new());
+        let mut writer = Writer::new(&SCHEMA, Vec::new());
         writer.append_ser(&msg)?;
         let encoded = writer.into_inner()?;
 
