@@ -1,12 +1,13 @@
 use anyhow::Result;
 use axum::{body::Bytes, routing::post, Json, Router};
 use compare_messages::{
-    proto_msg::messager_server::MessagerServer, test_avro_message, test_grpc_message,
-    test_json_message, JsonMessage, ServerGrpc, SCHEMA,
+    proto_msg::messager_server::MessagerServer, test_avro_axum_message, test_avro_zmq_message,
+    test_grpc_message, test_json_message, test_zmq_json_message, JsonMessage, ServerGrpc, SCHEMA,
 };
 use env_logger::Env;
 use log::{debug, info};
 use std::net::SocketAddr;
+use zeromq::{Socket, SocketRecv, SocketSend, ZmqMessage};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -19,7 +20,7 @@ async fn main() -> Result<()> {
         .parse()
         .unwrap();
 
-    info!("Comparing serialization formats over http:");
+    info!("Comparing serialization formats over http and zmq:");
     info!("Sending {} messages...", n_tests);
 
     tokio::spawn(async {
@@ -30,6 +31,14 @@ async fn main() -> Result<()> {
         grpc_server().await;
     });
 
+    tokio::spawn(async {
+        zmq_json_server().await;
+    });
+
+    tokio::spawn(async {
+        zmq_avro_server().await;
+    });
+
     let client = reqwest::Client::new();
     let tests = [1, 10, 100, 500, 1000, 5000, 10_000];
 
@@ -38,7 +47,11 @@ async fn main() -> Result<()> {
         println!("{}", result);
         let result = test_grpc_message(n_tests, n).await?;
         println!("{}", result);
-        let result = test_avro_message(n_tests, &client, n).await?;
+        let result = test_avro_axum_message(n_tests, &client, n).await?;
+        println!("{}", result);
+        let result = test_zmq_json_message(n_tests, n).await?;
+        println!("{}", result);
+        let result = test_avro_zmq_message(n_tests, n).await?;
         println!("{}", result);
         println!("-----------------------------------------------------------------------");
     }
@@ -89,4 +102,45 @@ async fn grpc_server() {
         .serve(addr)
         .await
         .unwrap();
+}
+
+async fn zmq_json_server() {
+    let mut socket = zeromq::RepSocket::new();
+    let addr = "tcp://127.0.0.1:5000";
+    info!("zmq json server starting...");
+    socket.bind(addr).await.expect("Failed to connect");
+    info!("zmq json listening on {}", addr);
+
+    loop {
+        let msg: String = socket.recv().await.unwrap().try_into().unwrap();
+        let decoded = serde_json::from_str::<JsonMessage>(&msg).unwrap();
+        let json_msg = serde_json::to_string(&decoded).unwrap();
+        socket.send(json_msg.into()).await.unwrap();
+    }
+}
+
+async fn zmq_avro_server() {
+    let mut socket = zeromq::RepSocket::new();
+    let addr = "tcp://127.0.0.1:6000";
+    socket.bind(addr).await.expect("Failed to connect");
+    info!("zmq avro listening on {}", addr);
+
+    loop {
+        let msg = socket.recv().await.unwrap();
+        let bytes = msg.iter().flat_map(|o| o.to_vec()).collect::<Vec<_>>();
+        let value = avro_rs::Reader::new(&bytes[..])
+            .unwrap()
+            .into_iter()
+            .next()
+            .unwrap()
+            .unwrap();
+        let decoded = avro_rs::from_value::<JsonMessage>(&value).unwrap();
+        debug!("Server got: {:?}", decoded);
+        let mut writer = avro_rs::Writer::new(&SCHEMA, Vec::new());
+        writer.append_ser(&decoded).unwrap();
+        let encoded = writer.into_inner().unwrap();
+        // let encoded = Bytes::from_iter(encoded);
+        let encoded_msg = ZmqMessage::from(encoded);
+        socket.send(encoded_msg).await.unwrap();
+    }
 }

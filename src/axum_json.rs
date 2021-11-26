@@ -32,6 +32,6 @@ pub async fn test_json_message(
             .await?;
         debug!("Client got: {:?}", msg);
     }
-    let json_result = TestResult::new("Axum json", n_tests, num_elements, t0.elapsed());
+    let json_result = TestResult::new("Axum json ", n_tests, num_elements, t0.elapsed());
     Ok(json_result)
 }

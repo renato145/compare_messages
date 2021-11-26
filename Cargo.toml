@@ -20,6 +20,7 @@ tonic = "0.6"
 prost = "0.9"
 avro-rs = "0.13"
 once_cell = "1.7"
+zeromq = "0.3"
 
 [build-dependencies]
 tonic-build = "0.6"
