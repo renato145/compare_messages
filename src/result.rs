@@ -1,6 +1,6 @@
 use std::{ops::Div, time::Duration};
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct TestResult {
     pub title: String,
     pub n_tests: usize,

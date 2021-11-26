@@ -9,7 +9,7 @@ use compare_messages::{
 use env_logger::Env;
 use log::{debug, info};
 use prost::Message;
-use std::{collections::HashMap, net::SocketAddr};
+use std::net::SocketAddr;
 use zeromq::{Socket, SocketRecv, SocketSend, ZmqMessage};
 
 #[tokio::main]
@@ -47,8 +47,9 @@ async fn main() -> Result<()> {
     });
 
     let client = reqwest::Client::new();
-    let tests = [3, 5];
-    // let tests = [1, 10, 100, 500, 1000, 5000];
+    // let tests = [10, 50, 100];
+    // let tests = [1, 10, 100, 500];
+    let tests = [1, 10, 100, 500, 1000, 5000];
     // let tests = [1, 10, 100, 500, 1000, 5000, 10_000, 50_000];
     let mut results = Vec::new();
 
