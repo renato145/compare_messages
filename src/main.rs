@@ -1,8 +1,13 @@
 use anyhow::Result;
 use axum::{body::Bytes, routing::post, Json, Router};
-use compare_messages::{JsonMessage, SCHEMA, ServerGrpc, proto_msg::{self, messager_server::MessagerServer}, test_avro_axum_message, test_avro_zmq_message, test_grpc_message, test_json_message, test_zmq_json_message};
+use compare_messages::{
+    proto_msg::{self, messager_server::MessagerServer},
+    test_avro_axum_message, test_avro_zmq_message, test_grpc_message, test_grpc_zmq_message,
+    test_json_message, test_zmq_json_message, JsonMessage, ServerGrpc, SCHEMA,
+};
 use env_logger::Env;
 use log::{debug, info};
+use prost::Message;
 use std::net::SocketAddr;
 use zeromq::{Socket, SocketRecv, SocketSend, ZmqMessage};
 
@@ -25,10 +30,6 @@ async fn main() -> Result<()> {
     });
 
     tokio::spawn(async {
-        grpc_server().await;
-    });
-
-    tokio::spawn(async {
         zmq_json_server().await;
     });
 
@@ -36,9 +37,18 @@ async fn main() -> Result<()> {
         zmq_avro_server().await;
     });
 
+    tokio::spawn(async {
+        grpc_server().await;
+    });
+
+    tokio::spawn(async {
+        zmq_grpc_server().await;
+    });
+
     let client = reqwest::Client::new();
-    let tests = [1, 10, 100, 500, 1000, 5000, 10_000, 50_000];
     // let tests = [3];
+    // let tests = [1, 10, 100, 500, 1000, 5000];
+    let tests = [1, 10, 100, 500, 1000, 5000, 10_000, 50_000];
 
     for n in tests {
         let result = test_json_message(n_tests, &client, n).await?;
@@ -48,6 +58,8 @@ async fn main() -> Result<()> {
         let result = test_avro_axum_message(n_tests, &client, n).await?;
         println!("{}", result);
         let result = test_zmq_json_message(n_tests, n).await?;
+        println!("{}", result);
+        let result = test_grpc_zmq_message(n_tests, n).await?;
         println!("{}", result);
         let result = test_avro_zmq_message(n_tests, n).await?;
         println!("{}", result);
@@ -117,34 +129,28 @@ async fn zmq_json_server() {
     }
 }
 
-// async fn zmq_grpc_server() {
-//     let mut socket = zeromq::RepSocket::new();
-//     let addr = "tcp://127.0.0.1:7000";
-//     socket.bind(addr).await.expect("Failed to connect");
-//     info!("zmq avro listening on {}", addr);
+async fn zmq_grpc_server() {
+    let mut socket = zeromq::RepSocket::new();
+    let addr = "tcp://127.0.0.1:7000";
+    socket.bind(addr).await.expect("Failed to connect");
+    info!("zmq grpc listening on {}", addr);
 
-//     loop {
-//         let msg = socket.recv().await.unwrap();
-//         let bytes = msg.iter().flat_map(|o| o.to_vec()).collect::<Vec<_>>();
+    loop {
+        let msg = socket.recv().await.unwrap();
+        let bytes = msg
+            .into_vecdeque()
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>();
 
-//         proto_msg::Message
-
-
-//         // let value = avro_rs::Reader::new(&bytes[..])
-//         //     .unwrap()
-//         //     .into_iter()
-//         //     .next()
-//         //     .unwrap()
-//         //     .unwrap();
-//         // let decoded = avro_rs::from_value::<JsonMessage>(&value).unwrap();
-//         // debug!("Server got: {:?}", decoded);
-//         // let mut writer = avro_rs::Writer::new(&SCHEMA, Vec::new());
-//         // writer.append_ser(&decoded).unwrap();
-//         // let encoded = writer.into_inner().unwrap();
-//         // let encoded_msg = ZmqMessage::from(encoded);
-//         // socket.send(encoded_msg).await.unwrap();
-//     }
-// }
+        let decoded = proto_msg::SomeMessage::decode(&bytes[..]).unwrap();
+        debug!("Server got: {:?}", decoded);
+        let mut encoded = Vec::new();
+        decoded.encode(&mut encoded).unwrap();
+        let encoded_msg = ZmqMessage::from(encoded);
+        socket.send(encoded_msg).await.unwrap();
+    }
+}
 
 async fn zmq_avro_server() {
     let mut socket = zeromq::RepSocket::new();
@@ -154,7 +160,11 @@ async fn zmq_avro_server() {
 
     loop {
         let msg = socket.recv().await.unwrap();
-        let bytes = msg.iter().flat_map(|o| o.to_vec()).collect::<Vec<_>>();
+        let bytes = msg
+            .into_vecdeque()
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>();
         let value = avro_rs::Reader::new(&bytes[..])
             .unwrap()
             .into_iter()

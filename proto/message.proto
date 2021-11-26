@@ -2,10 +2,10 @@ syntax = "proto3";
 package message;
 
 service Messager {
-	rpc SendMessage (Message) returns (Message);
+	rpc SendMessage (SomeMessage) returns (SomeMessage);
 }
 
-message Message {
+message SomeMessage {
 	repeated double values = 1;
 	repeated string descriptions = 2;
 }
