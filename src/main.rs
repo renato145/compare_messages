@@ -1,6 +1,7 @@
 use anyhow::Result;
 use axum::{body::Bytes, routing::post, Json, Router};
 use compare_messages::{
+    plot,
     proto_msg::{self, messager_server::MessagerServer},
     test_avro_axum_message, test_avro_zmq_message, test_grpc_message, test_grpc_zmq_message,
     test_json_message, test_zmq_json_message, JsonMessage, ServerGrpc, SCHEMA,
@@ -8,7 +9,7 @@ use compare_messages::{
 use env_logger::Env;
 use log::{debug, info};
 use prost::Message;
-use std::net::SocketAddr;
+use std::{collections::HashMap, net::SocketAddr};
 use zeromq::{Socket, SocketRecv, SocketSend, ZmqMessage};
 
 #[tokio::main]
@@ -46,26 +47,34 @@ async fn main() -> Result<()> {
     });
 
     let client = reqwest::Client::new();
-    // let tests = [3];
+    let tests = [3, 5];
     // let tests = [1, 10, 100, 500, 1000, 5000];
-    let tests = [1, 10, 100, 500, 1000, 5000, 10_000, 50_000];
+    // let tests = [1, 10, 100, 500, 1000, 5000, 10_000, 50_000];
+    let mut results = Vec::new();
 
     for n in tests {
         let result = test_json_message(n_tests, &client, n).await?;
         println!("{}", result);
+        results.push(result);
         let result = test_grpc_message(n_tests, n).await?;
         println!("{}", result);
+        results.push(result);
         let result = test_avro_axum_message(n_tests, &client, n).await?;
         println!("{}", result);
+        results.push(result);
         let result = test_zmq_json_message(n_tests, n).await?;
         println!("{}", result);
+        results.push(result);
         let result = test_grpc_zmq_message(n_tests, n).await?;
         println!("{}", result);
+        results.push(result);
         let result = test_avro_zmq_message(n_tests, n).await?;
         println!("{}", result);
+        results.push(result);
         println!("-----------------------------------------------------------------------");
     }
 
+    plot(results)?;
     Ok(())
 }
 

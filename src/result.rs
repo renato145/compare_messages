@@ -1,11 +1,12 @@
 use std::{ops::Div, time::Duration};
 
+#[derive(PartialEq, Eq, Hash)]
 pub struct TestResult {
-    title: String,
-    n_tests: usize,
-    num_elements: usize,
-    elapsed: Duration,
-    elapsed_mean: Duration,
+    pub title: String,
+    pub n_tests: usize,
+    pub num_elements: usize,
+    pub elapsed: Duration,
+    pub elapsed_mean: Duration,
 }
 
 impl TestResult {
