@@ -40,20 +40,20 @@ pub fn plot(results: Vec<TestResult>) -> Result<()> {
         .map(|x| (x.num_elements, x.elapsed.as_millis()))
         .into_grouping_map()
         .max();
-    // let y_range = {
-    //     let (a, b) = results
-    //         .iter()
-    //         .map(|x| x.elapsed.as_millis())
-    //         .minmax()
-    //         .into_option()
-    //         .expect("Missing data.");
-    //     a..(b + 1)
-    // };
 
     let n_tests = (&results[0]).n_tests;
-    let mut chart = ChartBuilder::on(&root)
+
+    let (upper, lower) = root.split_vertically(380);
+
+    lower.titled(
+        "Each message contains a 2 arrays (strings and numbers), each message is serialized and \
+              deserialized by the client and the server.",
+        ("sans-serif", 12).into_font().color(&BLACK.mix(0.6)),
+    )?;
+
+    let mut chart = ChartBuilder::on(&upper)
         .caption(
-            format!("Message comparisons ({} messages)", n_tests),
+            format!("Message speed comparisons ({} messages)", n_tests),
             ("sans-serif", (5).percent_height()),
         )
         .set_label_area_size(LabelAreaPosition::Left, (12).percent())
@@ -66,7 +66,7 @@ pub fn plot(results: Vec<TestResult>) -> Result<()> {
         .disable_x_mesh()
         .x_desc("Array size in message")
         .y_desc("ratio")
-        .axis_desc_style(("sans-serif", 18).into_font())
+        .axis_desc_style(("sans-serif", 14).into_font())
         .disable_x_axis()
         .draw()?;
 

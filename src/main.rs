@@ -47,9 +47,8 @@ async fn main() -> Result<()> {
     });
 
     let client = reqwest::Client::new();
-    let tests = [10, 50, 100];
-    // let tests = [1, 10, 100, 500, 1000, 5000];
-    // let tests = [1, 10, 100, 500, 1000, 5000, 10_000, 50_000];
+    // let tests = [10, 50, 100];
+    let tests = [1, 10, 100, 500, 1000, 5000, 10_000];
     let mut results = Vec::new();
 
     for n in tests {
