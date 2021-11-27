@@ -33,7 +33,7 @@ pub fn plot(results: Vec<TestResult>) -> Result<()> {
         .collect::<HashMap<_, _>>();
     let group_width = bar_width * title_map.len() + group_pad * 2;
     let x_range = 0..(group_width * x_map.len());
-    let y_range = 0f64..1f64;
+    let y_range = 0f64..1.05;
     // Maximum `y` on each `num_elements` group, to calculate ratios
     let max_elapsed_map = results
         .iter()
