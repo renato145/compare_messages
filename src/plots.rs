@@ -3,7 +3,10 @@ use std::collections::HashMap;
 use crate::TestResult;
 use anyhow::Result;
 use itertools::Itertools;
-use plotters::prelude::*;
+use plotters::{
+    prelude::*,
+    style::text_anchor::{HPos, Pos, VPos},
+};
 
 const OUT_FILE_NAME: &str = "results.svg";
 
@@ -60,15 +63,17 @@ pub fn plot(results: Vec<TestResult>) -> Result<()> {
         .disable_x_axis()
         .draw()?;
 
-    let vlines = (1..x_range.len()-1).map(|x| {
+    let vlines = (1..x_range.len() - 1).map(|x| {
         let x = x * group_width;
         PathElement::new(vec![(x, y_range.start), (x, y_range.end)], &BLACK.mix(0.75))
     });
     chart.draw_series(vlines)?;
 
+    let annotations_style = TextStyle::from(("sans-serif", 14).into_font().color(&BLACK.mix(0.9)))
+        .pos(Pos::new(HPos::Center, VPos::Top));
     let annotations = x_map.iter().map(|(num_elements, i)| {
         let x = (group_width * i) + (group_width / 2);
-        Text::new(format!("{}", num_elements), (x, 0), ("sans-serif", 18))
+        Text::new(format!("{}", num_elements), (x, 0), &annotations_style)
     });
     chart.draw_series(annotations)?;
 
