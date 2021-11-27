@@ -33,15 +33,22 @@ pub fn plot(results: Vec<TestResult>) -> Result<()> {
         .collect::<HashMap<_, _>>();
     let group_width = bar_width * title_map.len() + group_pad * 2;
     let x_range = 0..(group_width * x_map.len());
-    let y_range = {
-        let (a, b) = results
-            .iter()
-            .map(|x| x.elapsed.as_millis())
-            .minmax()
-            .into_option()
-            .expect("Missing data.");
-        a..(b + 1)
-    };
+    let y_range = 0f64..1f64;
+    // Maximum `y` on each `num_elements` group, to calculate ratios
+    let max_elapsed_map = results
+        .iter()
+        .map(|x| (x.num_elements, x.elapsed.as_millis()))
+        .into_grouping_map()
+        .max();
+    // let y_range = {
+    //     let (a, b) = results
+    //         .iter()
+    //         .map(|x| x.elapsed.as_millis())
+    //         .minmax()
+    //         .into_option()
+    //         .expect("Missing data.");
+    //     a..(b + 1)
+    // };
 
     let n_tests = (&results[0]).n_tests;
     let mut chart = ChartBuilder::on(&root)
@@ -58,7 +65,7 @@ pub fn plot(results: Vec<TestResult>) -> Result<()> {
         .configure_mesh()
         .disable_x_mesh()
         .x_desc("Array size in message")
-        .y_desc("Time (ms)")
+        .y_desc("ratio")
         .axis_desc_style(("sans-serif", 18).into_font())
         .disable_x_axis()
         .draw()?;
@@ -73,7 +80,7 @@ pub fn plot(results: Vec<TestResult>) -> Result<()> {
         .pos(Pos::new(HPos::Center, VPos::Top));
     let annotations = x_map.iter().map(|(num_elements, i)| {
         let x = (group_width * i) + (group_width / 2);
-        Text::new(format!("{}", num_elements), (x, 0), &annotations_style)
+        Text::new(format!("{}", num_elements), (x, 0.0), &annotations_style)
     });
     chart.draw_series(annotations)?;
 
@@ -89,11 +96,14 @@ pub fn plot(results: Vec<TestResult>) -> Result<()> {
     {
         let color = Palette99::pick(idx).mix(0.75);
         let x_offset = group_pad + bar_width * idx;
-        let series = get_plot_data(result).into_iter().map(|(x, y)| {
-            let x = *x_map.get(&x).unwrap();
-            let x0 = x * group_width + x_offset;
-            Rectangle::new([(x0, y), (x0 + bar_width, 0)], color.filled())
-        });
+        let series = get_plot_data(result)
+            .into_iter()
+            .map(|(num_elements, elapsed)| {
+                let x = *x_map.get(&num_elements).unwrap();
+                let x0 = x * group_width + x_offset;
+                let y = elapsed as f64 / *max_elapsed_map.get(&num_elements).unwrap() as f64;
+                Rectangle::new([(x0, y), (x0 + bar_width, 0.0)], color.filled())
+            });
         chart
             .draw_series(series)?
             .label(title)
